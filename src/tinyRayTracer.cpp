@@ -7,6 +7,8 @@
 #include <numbers>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+//git check
+//check again
 const int width = 1024;
 const int height = 768;
 struct Material
