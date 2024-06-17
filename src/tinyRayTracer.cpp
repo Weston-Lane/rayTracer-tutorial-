@@ -23,47 +23,61 @@ struct Sphere
 	Material material;
 	Sphere(const Vec3f& c, const float& r, const Material& m) : center(c), radius(r), material(m) {}
 
-	bool ray_intersect(const Vec3f& o, Vec3f& dir, float& t0) {
+	bool ray_intersect(const Vec3f& o, Vec3f& dir, float& t ) {
 		Vec3f orig = o - center;
 		double a = std::pow(dir[0], 2) + std::pow(dir[1], 2) + std::pow(dir[2], 2);
 		double b = 2 * (orig[0] * dir[0] + orig[1] * dir[1] + orig[2] * dir[2]);
 		double c = std::pow(orig[0], 2) + std::pow(orig[1], 2) + std::pow(orig[2], 2) - std::pow(radius, 2);
 		double discr = std::pow(b, 2) - 4 * a * c;
-		//implement t later
-		//std::cout << "a: " << a << " b: " << b << " c: " << c << " discr: " << discr << std::endl;
+
 		if (discr < 0) return false;//no intersection
-		if (discr == 0) return true;//one intersection
-		if (discr > 0) return true;//two intersections
+
+		t = ((-b) - std::sqrt(discr)) / (2 * a);
+		double t2 = ((-b) + std::sqrt(discr)) / (2 * a);
+
+		if (t < 0) t = t2;//checking to see if at least one is positive
+		if (t < 0) return false;
+
+		return true;
+
+		
+		//if (discr > 0) return true;//two intersections
 	}
 
 };
 
+bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres, Vec3f& hit, Vec3f& N, Material& mat)
+{
+	float prv_sphere_dist = std::numeric_limits<float>::max();
+
+	for (auto s : spheres)//for every sphere get the smallest pos tVal
+	{
+		float tVal;//scalar value for the distance to instersect
+
+		if (s.ray_intersect(orig, dir, tVal) && tVal < prv_sphere_dist)//if tVal is smaller than that is the pixel that should be in front
+		{
+			prv_sphere_dist = tVal;
+
+			hit = orig + dir * tVal;//calculate the intersect pos//used for lighting
+			N = (hit - s.center).normalize();//re orients the hit pos and noramlizes the vector
+			mat = s.material;//sets material of the pixel to hit
+		}
+	}
+	//if(prv_sphere_dist<100000)std::cout << "sphere dist: " << prv_sphere_dist << std::endl;
+	return prv_sphere_dist < 1000;
+
+}
+
 Vec3f cast_ray(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres)
 {
-	float sphere_dist = std::numeric_limits<float>::max();
-	Sphere* closest=nullptr;
-	float close=std::numeric_limits<int>::max();
-	for (Sphere s : spheres)
+	Vec3f hit, N;//hit pos and normalized center
+	Material mat;//material of the pixel
+
+	if (sceneIntersect(orig, dir, spheres, hit, N, mat))//check if intersect
 	{
-		if (s.ray_intersect(orig, dir, sphere_dist))
-		{
-			if (s.center.z < close)// does not work must be closest at intersection point
-			{
-				close = s.center.z;
-				closest = &s;
-			}
-
-		}
-
+		return mat.diffuse_color;
 	}
-	
-	if (close != std::numeric_limits<float>::max())
-		if (closest != nullptr)
-			return closest->material.diffuse_color;
-		else
-			return Vec3f(.2, .7, .8);
-
-	
+	else return Vec3f(0.2, 0.7, 0.8);
 
 }
 
@@ -82,7 +96,7 @@ void render(std::vector<Sphere>& spheres) {
 			//std::cout << "dir: " << x << " " << y << " " << -1 << std::endl;
 			Vec3f dir = Vec3f(x, y, -1).normalize();//direction shooting rays into, so can be unsigned since normalized
 			//std::cout << "dir: " << dir[0] << " " << dir[1] << " " << dir[2] << std::endl;
-			framebuffer[i + j * width] = cast_ray(Vec3f (0, 0, 0)/*camera pos, negative forward, pos back*/ , dir, spheres);
+			framebuffer[i + j * width] = cast_ray(Vec3f (0, 0, 0)/*camera pos, negative forward, pos back*/ , dir, spheres);//cast a ray for every pixel
 		}
 	}
 
@@ -109,9 +123,9 @@ int main() {
 	Material red_rubber(Vec3f(.3, .1, .1));
 
 	std::vector<Sphere> spheres;
-	spheres.push_back(Sphere(Vec3f(-3, 0, -16), 2, red_rubber));
+	spheres.push_back(Sphere(Vec3f(-3, 0, -16), 2, ivory));
 	spheres.push_back(Sphere(Vec3f(-1.0, -1.5, -12), 2, red_rubber));
-	spheres.push_back(Sphere(Vec3f(1.5, -0.5, -18), 3, ivory));
+	spheres.push_back(Sphere(Vec3f(1.5, -0.5, -18), 3, red_rubber));
 	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, ivory));
 
 	render(spheres);
