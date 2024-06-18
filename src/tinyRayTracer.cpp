@@ -10,6 +10,13 @@
 
 const int width = 1024;
 const int height = 768;
+struct Light
+{
+	Light(const Vec3f& p, const float& i) : postion(p), intensity(i) {};
+
+	Vec3f postion;
+	float intensity;
+};
 struct Material
 {
 	Material(const Vec3f& color) :diffuse_color(color) {};
@@ -51,10 +58,10 @@ bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres,
 
 	for (auto s : spheres)//for every sphere get the smallest pos tVal
 	{
-		float tVal;//scalar value for the distance to instersect
+		float tVal=0;//scalar value for the distance to instersect
 
-		if (s.ray_intersect(orig, dir, tVal) && tVal < prv_sphere_dist)//if tVal is smaller than that is the pixel that should be in front
-		{
+		if (s.ray_intersect(orig, dir, tVal) && tVal < prv_sphere_dist)//if tVal is smaller
+		{																//(determined by raIntersect()), then that is the pixel that should be in front
 			prv_sphere_dist = tVal;
 
 			hit = orig + dir * tVal;//calculate the intersect pos//used for lighting
@@ -63,25 +70,36 @@ bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres,
 		}
 	}
 	
-	return prv_sphere_dist < 1000;
+	if (prv_sphere_dist == std::numeric_limits<float>::max())//if no sphere pixel was detected
+		return false;
+	
+		return true;//else, prvSphereDist is different than max so there was an intersect
+		
 
 }
 
-Vec3f cast_ray(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres)
+Vec3f cast_ray(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres, std::vector<Light>& lights)
 {
 	Vec3f hit, N;//hit pos and normalized center
 	Material mat;//material of the pixel
 
 	if (sceneIntersect(orig, dir, spheres, hit, N, mat))//check if intersect
 	{
-		return mat.diffuse_color;
+		float diffuseLightIntensity = 0;
+
+		for (auto l : lights)
+		{
+			Vec3f lightDir = (l.postion - hit).normalize();
+			diffuseLightIntensity += l.intensity * std::max(0.f, lightDir * N);
+		}
+		return mat.diffuse_color * diffuseLightIntensity;
 	}
 	else return Vec3f(0.2, 0.7, 0.8);
 
 }
 
 
-void render(std::vector<Sphere>& spheres) {
+void render(std::vector<Sphere>& spheres, std::vector<Light>& lights) {
 
 	
 	std::vector<Vec3f> framebuffer(width * height);//vector of Vec3f with a red blue and green value for each pixel in the image
@@ -95,7 +113,7 @@ void render(std::vector<Sphere>& spheres) {
 			
 			Vec3f dir = Vec3f(x, y, -1).normalize();//direction shooting rays into, so can be unsigned since normalized
 			
-			framebuffer[i + j * width] = cast_ray(Vec3f (0, 0, 0)/*camera pos, negative forward, pos back*/ , dir, spheres);//cast a ray for every pixel
+			framebuffer[i + j * width] = cast_ray(Vec3f (0, 0, 0)/*camera pos, negative forward, pos back*/ , dir, spheres, lights);//cast a ray for every pixel
 		}
 	}
 
@@ -125,7 +143,10 @@ int main() {
 	spheres.push_back(Sphere(Vec3f(1.5, -0.5, -18), 3, red_rubber));
 	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, ivory));
 
-	render(spheres);
+	std::vector<Light>  lights;
+	lights.push_back(Light(Vec3f(-20, 20, 20), 1.5));
+
+	render(spheres,lights);
 	//render(s2);
 	return 0;
 }
