@@ -41,8 +41,6 @@ struct Sphere
 
 		return true;
 
-		
-		//if (discr > 0) return true;//two intersections
 	}
 
 };
@@ -64,7 +62,7 @@ bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres,
 			mat = s.material;//sets material of the pixel to hit
 		}
 	}
-	//if(prv_sphere_dist<100000)std::cout << "sphere dist: " << prv_sphere_dist << std::endl;
+	
 	return prv_sphere_dist < 1000;
 
 }
@@ -94,9 +92,9 @@ void render(std::vector<Sphere>& spheres) {
 		for (size_t i = 0; i < width; i++) {
 			float x = (2 * (i + 0.5) / (float)width - 1)/*maps values between -1 and 1 */ * tan(fov / 2.)/*maps values between -tan and tan(fov/2)*/ * width / (float)height;//aspect ratio
 			float y = -(2 * (j + 0.5) / (float)height - 1) * tan(fov / 2.);//negative because y is inverted in the image
-			//std::cout << "dir: " << x << " " << y << " " << -1 << std::endl;
+			
 			Vec3f dir = Vec3f(x, y, -1).normalize();//direction shooting rays into, so can be unsigned since normalized
-			//std::cout << "dir: " << dir[0] << " " << dir[1] << " " << dir[2] << std::endl;
+			
 			framebuffer[i + j * width] = cast_ray(Vec3f (0, 0, 0)/*camera pos, negative forward, pos back*/ , dir, spheres);//cast a ray for every pixel
 		}
 	}
@@ -107,9 +105,7 @@ void render(std::vector<Sphere>& spheres) {
 		imageData[i * 3] = (unsigned char)(255 * std::max(0.f, std::min(1.f, framebuffer[i][0])));//transfering framebuffer vector to something stbi can take in
 		imageData[i * 3 + 1] = (unsigned char)(255 * std::max(0.f, std::min(1.f, framebuffer[i][1])));
 		imageData[i * 3 + 2] = (unsigned char)(255 * std::max(0.f, std::min(1.f, framebuffer[i][2])));
-		//imageData[i * 3] = (unsigned char)(255 * framebuffer[i][0]);
-		//imageData[i * 3 + 1] = (unsigned char)(255 * framebuffer[i][1]);
-		//imageData[i * 3 + 2] = (unsigned char)(255 * framebuffer[i][2]);
+
 	}
 	stbi_write_jpg("out.jpg", width, height, 3, imageData.data(), 100);// takes in imageData and creates a jpg file
 
