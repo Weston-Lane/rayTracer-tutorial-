@@ -19,8 +19,10 @@ struct Light
 };
 struct Material
 {
-	Material(const Vec3f& color) :diffuse_color(color) {};
-	Material():diffuse_color() {};
+	Material(const Vec2f& a, const Vec3f& color, const float s) : albedo(a), specular_exponent(s), diffuse_color(color) {};
+	Material() : albedo(1,0), specular_exponent(), diffuse_color() {};
+	Vec2f albedo;
+	float specular_exponent;
 	Vec3f diffuse_color;
 
 };
@@ -52,6 +54,11 @@ struct Sphere
 
 };
 
+Vec3f reflect(const Vec3f& Lhat, const Vec3f& Nhat)
+{
+	return Nhat* 2.f * (Lhat * Nhat)-Lhat;
+}
+
 bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres, Vec3f& hit, Vec3f& N, Material& mat)
 {
 	float prv_sphere_dist = std::numeric_limits<float>::max();
@@ -65,7 +72,7 @@ bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres,
 			prv_sphere_dist = tVal;
 
 			hit = orig + dir * tVal;//calculate the intersect pos//used for lighting
-			N = (hit - s.center).normalize();//re orients the hit pos and noramlizes the vector
+			N = (hit - s.center).normalize();//vector from the center of the sphere to the hit pos AKA the normal of the hit 
 			mat = s.material;//sets material of the pixel to hit
 		}
 	}
@@ -80,19 +87,20 @@ bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres,
 
 Vec3f cast_ray(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres, std::vector<Light>& lights)
 {
-	Vec3f hit, N;//hit pos and normalized center
+	Vec3f hit, N;//hit pos and normal vector
 	Material mat;//material of the pixel
 
 	if (sceneIntersect(orig, dir, spheres, hit, N, mat))//check if intersect
 	{
-		float diffuseLightIntensity = 0;
+		float diffuseLightIntensity = 0,specularLightIntensity=0;
 
 		for (auto l : lights)
 		{
 			Vec3f lightDir = (l.postion - hit).normalize();
 			diffuseLightIntensity += l.intensity * std::max(0.f, lightDir * N);
+			specularLightIntensity += std::pow(std::max(0.f, reflect(lightDir, N) * dir), mat.specular_exponent)*l.intensity;
 		}
-		return mat.diffuse_color * diffuseLightIntensity;
+		return mat.diffuse_color * diffuseLightIntensity * mat.albedo[0] + Vec3f(1.f,1.f,1.f) * specularLightIntensity * mat.albedo[1];
 	}
 	else return Vec3f(0.2, 0.7, 0.8);
 
@@ -120,6 +128,7 @@ void render(std::vector<Sphere>& spheres, std::vector<Light>& lights) {
 	std::vector<unsigned char> imageData(width * height * 3);//vector of unsigned char with an Red blue and green value in sequence for each pixel in the image
 	for (size_t i = 0; i < width * height; ++i)
 	{
+
 		imageData[i * 3] = (unsigned char)(255 * std::max(0.f, std::min(1.f, framebuffer[i][0])));//transfering framebuffer vector to something stbi can take in
 		imageData[i * 3 + 1] = (unsigned char)(255 * std::max(0.f, std::min(1.f, framebuffer[i][1])));
 		imageData[i * 3 + 2] = (unsigned char)(255 * std::max(0.f, std::min(1.f, framebuffer[i][2])));
@@ -134,8 +143,8 @@ void render(std::vector<Sphere>& spheres, std::vector<Light>& lights) {
 
 int main() {
 
-	Material ivory(Vec3f(0.4, 0.4, 0.3));
-	Material red_rubber(Vec3f(.3, .1, .1));
+	Material ivory(Vec2f(0.6, 0.3), Vec3f(0.4, 0.4, 0.3), 50.);
+	Material red_rubber(Vec2f(0.9, 0.1), Vec3f(0.3, 0.1, 0.1), 10.);
 
 	std::vector<Sphere> spheres;
 	spheres.push_back(Sphere(Vec3f(-3, 0, -16), 2, ivory));
@@ -145,6 +154,8 @@ int main() {
 
 	std::vector<Light>  lights;
 	lights.push_back(Light(Vec3f(-20, 20, 20), 1.5));
+	lights.push_back(Light(Vec3f(30, 50, -25), 1.8));
+	lights.push_back(Light(Vec3f(30, 20, 30), 1.7));
 
 	render(spheres,lights);
 	//render(s2);
