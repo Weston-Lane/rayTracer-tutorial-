@@ -56,7 +56,7 @@ struct Sphere
 
 Vec3f reflect(const Vec3f& Lhat, const Vec3f& Nhat)
 {
-	return Nhat* 2.f * (Lhat * Nhat)-Lhat;
+	return Lhat-Nhat* 2.f * (Lhat * Nhat);
 }
 
 bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres, Vec3f& hit, Vec3f& N, Material& mat)
