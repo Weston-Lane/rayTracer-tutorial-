@@ -68,9 +68,8 @@ bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres,
 		float tVal=0;//scalar value for the distance to instersect
 
 		if (s.ray_intersect(orig, dir, tVal) && tVal < prv_sphere_dist)//if tVal is smaller
-		{																//(determined by raIntersect()), then that is the pixel that should be in front
+		{																//(determined by rayIntersect()), then that is the pixel that should be in front
 			prv_sphere_dist = tVal;
-
 			hit = orig + dir * tVal;//calculate the intersect pos//used for lighting
 			N = (hit - s.center).normalize();//vector from the center of the sphere to the hit pos AKA the normal of the hit 
 			mat = s.material;//sets material of the pixel to hit
@@ -97,6 +96,15 @@ Vec3f cast_ray(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres, std:
 		for (auto l : lights)
 		{
 			Vec3f lightDir = (l.postion - hit).normalize();
+
+			//shadows
+			float lightDistance = (l.postion - hit).norm();//remember norm is the length of the vector
+			Vec3f shadowOrig = (lightDir * N) < 0 ? hit - N * 1e-3 : hit + N*1e-3;
+			Vec3f shadowHit, shadowN;
+			Material tempMat;
+			if (sceneIntersect(shadowOrig, lightDir, spheres, shadowHit, shadowN, tempMat) && (shadowHit - shadowOrig).norm() < lightDistance)
+				continue;
+
 			diffuseLightIntensity += l.intensity * std::max(0.f, lightDir * N);
 			specularLightIntensity += std::pow(std::max(0.f, reflect(lightDir, N) * dir), mat.specular_exponent)*l.intensity;
 		}
@@ -158,6 +166,6 @@ int main() {
 	lights.push_back(Light(Vec3f(30, 20, 30), 1.7));
 
 	render(spheres,lights);
-	//render(s2);
+	
 	return 0;
 }
