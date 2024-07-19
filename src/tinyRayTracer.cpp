@@ -19,9 +19,9 @@ struct Light
 };
 struct Material
 {
-	Material(const Vec2f& a, const Vec3f& color, const float s) : albedo(a), specular_exponent(s), diffuse_color(color) {};
-	Material() : albedo(1,0), specular_exponent(), diffuse_color() {};
-	Vec2f albedo;
+	Material(const Vec3f& a, const Vec3f& color, const float s) : albedo(a), specular_exponent(s), diffuse_color(color) {};
+	Material() : albedo(1,0,0), specular_exponent(), diffuse_color() {};
+	Vec3f albedo;
 	float specular_exponent;
 	Vec3f diffuse_color;
 
@@ -84,33 +84,39 @@ bool sceneIntersect(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres,
 
 }
 
-Vec3f cast_ray(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres, std::vector<Light>& lights)
+Vec3f cast_ray(const Vec3f& orig, Vec3f& dir, std::vector<Sphere>& spheres, std::vector<Light>& lights, size_t depth=0)//depth is initialized here, pretty neat
 {
 	Vec3f hit, N;//hit pos and normal vector
 	Material mat;//material of the pixel
+	if(depth>4||!sceneIntersect(orig, dir, spheres, hit, N, mat))//refelction base case
+		return Vec3f(0.2, 0.7, 0.8);
+	
+//else{ ray interescted with a sphere
+	Vec3f reflectionDir = reflect(dir, N).normalize();//get reflection ray
+	Vec3f reflectionOrig = reflectionDir * N < 0 ? hit - N * 1e-3 : hit + N * 1e-3;//get reflection origin with a slight offset as to not collide with itself: a negative dot product would mean that the ray is directed away from eachother, therefore the reflection would not occur
+	//gets the color of the pixel based on the refelction.the depth is incremented by one and reflected at most 4 times
+	Vec3f reflectionColor = cast_ray(reflectionOrig, reflectionDir, spheres, lights, depth++);
 
-	if (sceneIntersect(orig, dir, spheres, hit, N, mat))//check if intersect
+	float diffuseLightIntensity = 0,specularLightIntensity=0;
+
+	for (auto l : lights)
 	{
-		float diffuseLightIntensity = 0,specularLightIntensity=0;
+		Vec3f lightDir = (l.postion - hit).normalize();
 
-		for (auto l : lights)
-		{
-			Vec3f lightDir = (l.postion - hit).normalize();
+		//shadows
+		float lightDistance = (l.postion - hit).norm();//remember norm is the length of the vector
+		Vec3f shadowOrig = (lightDir * N) < 0 ? hit - N * 1e-3 : hit + N*1e-3;
+		Vec3f shadowHit, shadowN;
+		Material tempMat;
+		if (sceneIntersect(shadowOrig, lightDir, spheres, shadowHit, shadowN, tempMat) && (shadowHit - shadowOrig).norm() < lightDistance)
+			continue;
 
-			//shadows
-			float lightDistance = (l.postion - hit).norm();//remember norm is the length of the vector
-			Vec3f shadowOrig = (lightDir * N) < 0 ? hit - N * 1e-3 : hit + N*1e-3;
-			Vec3f shadowHit, shadowN;
-			Material tempMat;
-			if (sceneIntersect(shadowOrig, lightDir, spheres, shadowHit, shadowN, tempMat) && (shadowHit - shadowOrig).norm() < lightDistance)
-				continue;
-
-			diffuseLightIntensity += l.intensity * std::max(0.f, lightDir * N);
-			specularLightIntensity += std::pow(std::max(0.f, reflect(lightDir, N) * dir), mat.specular_exponent)*l.intensity;
-		}
-		return mat.diffuse_color * diffuseLightIntensity * mat.albedo[0] + Vec3f(1.f,1.f,1.f) * specularLightIntensity * mat.albedo[1];
+		diffuseLightIntensity += l.intensity * std::max(0.f, lightDir * N);
+		specularLightIntensity += std::pow(std::max(0.f, reflect(lightDir, N) * dir), mat.specular_exponent)*l.intensity;
 	}
-	else return Vec3f(0.2, 0.7, 0.8);
+		return mat.diffuse_color * diffuseLightIntensity * mat.albedo[0] + Vec3f(1.f,1.f,1.f) * specularLightIntensity * mat.albedo[1]+reflectionColor*mat.albedo[2];
+	
+	
 
 }
 
@@ -151,14 +157,15 @@ void render(std::vector<Sphere>& spheres, std::vector<Light>& lights) {
 
 int main() {
 
-	Material ivory(Vec2f(0.6, 0.3), Vec3f(0.4, 0.4, 0.3), 50.);
-	Material red_rubber(Vec2f(0.9, 0.1), Vec3f(0.3, 0.1, 0.1), 10.);
+	Material ivory(Vec3f(0.6, 0.3,.1f), Vec3f(0.4, 0.4, 0.3), 50.);
+	Material red_rubber(Vec3f(0.9, 0.1,.0f), Vec3f(0.3, 0.1, 0.1), 10.);
+	Material mirror(Vec3f(0.0, 10.0, 0.8), Vec3f(1.0, 1.0, 1.0), 1425.);
 
 	std::vector<Sphere> spheres;
 	spheres.push_back(Sphere(Vec3f(-3, 0, -16), 2, ivory));
-	spheres.push_back(Sphere(Vec3f(-1.0, -1.5, -12), 2, red_rubber));
+	spheres.push_back(Sphere(Vec3f(-1.0, -1.5, -12), 2, mirror));
 	spheres.push_back(Sphere(Vec3f(1.5, -0.5, -18), 3, red_rubber));
-	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, ivory));
+	spheres.push_back(Sphere(Vec3f(7, 5, -18), 4, mirror));
 
 	std::vector<Light>  lights;
 	lights.push_back(Light(Vec3f(-20, 20, 20), 1.5));
